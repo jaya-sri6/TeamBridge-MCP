@@ -90,6 +90,7 @@ export function App() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddStoreModal, setShowAddStoreModal] = useState(false);
   const [newKeyPlaintext, setNewKeyPlaintext] = useState<string | null>(null);
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   // Forms
   const [newServerForm, setNewServerForm] = useState({
@@ -297,7 +298,11 @@ export function App() {
       {/* Top Navbar */}
       <header className="app-header">
         <div className="brand">
-          <div className="brand-icon">⚡</div>
+          <div className="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#ffffff" }}>
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="white" stroke="none" />
+            </svg>
+          </div>
           <div>
             <div className="brand-title">TeamBridge MCP</div>
             <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
@@ -359,10 +364,9 @@ export function App() {
             href="http://store.127.0.0.1.nip.io"
             target="_blank"
             rel="noreferrer"
-            className="btn btn-secondary"
-            style={{ fontSize: "0.78rem", padding: "0.35rem 0.7rem" }}
+            className="storefront-link-btn"
           >
-            🛍️ Open Storefront ↗
+            <span>🛍️</span> Open Storefront <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>↗</span>
           </a>
 
           <select
@@ -390,15 +394,26 @@ export function App() {
         {/* TAB 1: MCP UPSTREAM SERVERS */}
         {activeTab === "servers" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="hero-header">
               <div>
-                <h2>Registered Upstream MCP Servers</h2>
-                <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>
-                  The Gateway aggregates all tools behind the single MCP endpoint:{" "}
-                  <code style={{ color: "#a5b4fc", fontFamily: "var(--font-mono)" }}>
-                    http://dashboard.127.0.0.1.nip.io/mcp
-                  </code>
+                <h1 className="hero-title">Registered Upstream MCP Servers</h1>
+                <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", marginTop: "0.25rem" }}>
+                  The Unified Gateway aggregates all tools behind the single MCP endpoint:
                 </p>
+                <div className="hero-endpoint-box">
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>Unified Endpoint:</span>
+                  <code className="hero-endpoint-code">http://dashboard.127.0.0.1.nip.io/mcp</code>
+                  <button
+                    className="copy-pill-btn"
+                    onClick={() => {
+                      navigator.clipboard.writeText("http://dashboard.127.0.0.1.nip.io/mcp");
+                      setCopiedEndpoint(true);
+                      setTimeout(() => setCopiedEndpoint(false), 2000);
+                    }}
+                  >
+                    {copiedEndpoint ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
               </div>
               {currentUser?.role === "admin" && (
                 <button className="btn btn-primary" onClick={() => setShowAddServerModal(true)}>
@@ -423,8 +438,13 @@ export function App() {
                     </div>
 
                     {ups.latencyMs !== undefined && (
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
-                        ⚡ Latency: {ups.latencyMs}ms | Slug: <code>{ups.slug}</code>
+                      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span className="latency-chip">
+                          ⚡ {ups.latencyMs}ms latency
+                        </span>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                          Slug: <code>{ups.slug}</code>
+                        </span>
                       </div>
                     )}
 
