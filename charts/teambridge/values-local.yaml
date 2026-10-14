@@ -6,6 +6,8 @@ global:
 store:
   ingress:
     host: "store.127.0.0.1.nip.io"
+    additionalHosts:
+      - "store2.127.0.0.1.nip.io"
 
 gateway:
   ingress:
