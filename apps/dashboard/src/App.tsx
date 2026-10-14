@@ -297,95 +297,99 @@ export function App() {
     <div className="app-container">
       {/* Top Navbar */}
       <header className="app-header">
-        <div className="brand">
-          <div className="brand-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#ffffff" }}>
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="white" stroke="none" />
-            </svg>
-          </div>
-          <div>
-            <div className="brand-title">TeamBridge MCP</div>
-            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-              WooCommerce & Team Gateway on Kubernetes
+        <div className="header-top-row">
+          <div className="brand">
+            <div className="brand-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#ffffff" }}>
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="white" stroke="none" />
+              </svg>
             </div>
+            <div>
+              <div className="brand-title">TeamBridge MCP</div>
+              <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                WooCommerce & Team Gateway on Kubernetes
+              </div>
+            </div>
+            <span className="brand-badge">Kubernetes v1.35</span>
           </div>
-          <span className="brand-badge">Kubernetes v1.35</span>
+
+          {/* User Identity Switcher */}
+          <div className="user-switcher">
+            <a
+              href="http://store.127.0.0.1.nip.io"
+              target="_blank"
+              rel="noreferrer"
+              className="storefront-link-btn"
+            >
+              <span>🛍️</span> Open Storefront <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>↗</span>
+            </a>
+
+            <select
+              className="user-select"
+              value={currentUser?.id || ""}
+              onChange={(e) => {
+                const u = users.find((x) => x.id === e.target.value);
+                if (u) setCurrentUser(u);
+              }}
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.role.toUpperCase()})
+                </option>
+              ))}
+            </select>
+            {currentUser && (
+              <span className={`role-badge ${currentUser.role}`}>{currentUser.role}</span>
+            )}
+          </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="nav-tabs">
-          <button
-            className={`nav-tab ${activeTab === "servers" ? "active" : ""}`}
-            onClick={() => setActiveTab("servers")}
-          >
-            🔌 MCP Servers
-          </button>
-          <button
-            className={`nav-tab ${activeTab === "chat" ? "active" : ""}`}
-            onClick={() => setActiveTab("chat")}
-          >
-            🤖 AI Chat Agent
-          </button>
-          <button
-            className={`nav-tab ${activeTab === "team" ? "active" : ""}`}
-            onClick={() => setActiveTab("team")}
-          >
-            🔑 Team & API Keys
-          </button>
-          <button
-            className={`nav-tab ${activeTab === "audit" ? "active" : ""}`}
-            onClick={() => setActiveTab("audit")}
-          >
-            📜 Audit Log
-          </button>
-          <button
-            className={`nav-tab ${activeTab === "stores" ? "active" : ""}`}
-            onClick={() => setActiveTab("stores")}
-          >
-            🏪 Stores
-          </button>
-          <button
-            className={`nav-tab ${activeTab === "metrics" ? "active" : ""}`}
-            onClick={() => setActiveTab("metrics")}
-          >
-            📊 Metrics
-          </button>
-          <button
-            className={`nav-tab ${activeTab === "rbac" ? "active" : ""}`}
-            onClick={() => setActiveTab("rbac")}
-          >
-            🛡️ RBAC & Security
-          </button>
-        </nav>
-
-        {/* User Identity Switcher */}
-        <div className="user-switcher">
-          <a
-            href="http://store.127.0.0.1.nip.io"
-            target="_blank"
-            rel="noreferrer"
-            className="storefront-link-btn"
-          >
-            <span>🛍️</span> Open Storefront <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>↗</span>
-          </a>
-
-          <select
-            className="user-select"
-            value={currentUser?.id || ""}
-            onChange={(e) => {
-              const u = users.find((x) => x.id === e.target.value);
-              if (u) setCurrentUser(u);
-            }}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.role.toUpperCase()})
-              </option>
-            ))}
-          </select>
-          {currentUser && (
-            <span className={`role-badge ${currentUser.role}`}>{currentUser.role}</span>
-          )}
+        {/* Navigation Tabs Subnav */}
+        <div className="header-subnav-row">
+          <nav className="nav-tabs">
+            <button
+              className={`nav-tab ${activeTab === "servers" ? "active" : ""}`}
+              onClick={() => setActiveTab("servers")}
+            >
+              🔌 MCP Servers
+            </button>
+            <button
+              className={`nav-tab ${activeTab === "chat" ? "active" : ""}`}
+              onClick={() => setActiveTab("chat")}
+            >
+              🤖 AI Chat Agent
+            </button>
+            <button
+              className={`nav-tab ${activeTab === "team" ? "active" : ""}`}
+              onClick={() => setActiveTab("team")}
+            >
+              🔑 Team & API Keys
+            </button>
+            <button
+              className={`nav-tab ${activeTab === "audit" ? "active" : ""}`}
+              onClick={() => setActiveTab("audit")}
+            >
+              📜 Audit Log
+            </button>
+            <button
+              className={`nav-tab ${activeTab === "stores" ? "active" : ""}`}
+              onClick={() => setActiveTab("stores")}
+            >
+              🏪 Stores
+            </button>
+            <button
+              className={`nav-tab ${activeTab === "metrics" ? "active" : ""}`}
+              onClick={() => setActiveTab("metrics")}
+            >
+              📊 Metrics
+            </button>
+            <button
+              className={`nav-tab ${activeTab === "rbac" ? "active" : ""}`}
+              onClick={() => setActiveTab("rbac")}
+            >
+              🛡️ RBAC & Security
+            </button>
+          </nav>
         </div>
       </header>
 
