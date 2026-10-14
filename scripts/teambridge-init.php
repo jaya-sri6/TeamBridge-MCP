@@ -6,11 +6,31 @@
  * Author: TeamBridge MCP
  */
 
+// Reverse proxy header support
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
+}
+
+// Disable canonical redirects behind Kubernetes Ingress to prevent redirect loops
+remove_action('template_redirect', 'redirect_canonical');
+
 add_action('init', function() {
     // 0. Ensure WordPress core is installed
     if (!is_blog_installed()) {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         wp_install('TeamBridge WooCommerce Store', 'admin', 'admin@teambridge.local', true, '', 'adminpassword123');
+    }
+
+    // Enforce siteurl and home to match public ingress host
+    $store_url = 'http://store.127.0.0.1.nip.io';
+    if (get_option('siteurl') !== $store_url) {
+        update_option('siteurl', $store_url);
+    }
+    if (get_option('home') !== $store_url) {
+        update_option('home', $store_url);
     }
 
     if (!function_exists('is_plugin_active')) {
