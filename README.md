@@ -162,7 +162,7 @@ The Definition of Done requires showing the end-to-end lifecycle across two user
 
 ### Step 1: Storefront Order Placement
 1. Open `http://store.127.0.0.1.nip.io`.
-2. Browse the pre-seeded catalog (e.g. *Ergonomic Developer Chair*, *Mechanical Keyboard*).
+2. Browse the live catalog with high-resolution product photography (e.g. *Neon Cyber Headphones*, *Admin Special Keyboard*, *Laser Engraved Desk Pad*).
 3. Add a product to your cart and proceed to Checkout.
 4. Select **Cash on Delivery (Test)** as the payment method and click **Place Order**.
 5. Order confirmation displays the order number (e.g. Order #12).
@@ -287,7 +287,7 @@ node scripts/verify-dod.mjs
 ## 🌟 Bonus Features & Stand-Out Differentiators Implemented
 
 1. **Multi-Store Provisioning Platform (Primary Bonus)**:
-   - Dynamic store provisioning from Dashboard and API.
+   - Dynamic store provisioning from Dashboard and API (`/api/stores`).
    - Automatic WooCommerce MCP upstream registration with isolated tool prefixes (`store2__...`).
    - Cross-store order comparison queries in the AI Chat Agent.
    - Clean teardown with automatic resource and upstream unregistration.
@@ -302,5 +302,14 @@ node scripts/verify-dod.mjs
    - **SSRF Defense**: Active validation blocking AWS/GCP/Azure metadata services (`169.254.169.254`) and restricted ports on upstream registration.
    - **AES-256-GCM Encryption at Rest**: Upstream secrets encrypted in SQLite and decrypted in-memory only.
    - **Zero-Trust NetworkPolicies**: Calico policies isolating database and upstreams from unauthorized traffic.
-5. **Production-like VPS Deployment**: Complete Helm chart with `values-local.yaml` (Kind) and `values-prod.yaml` (VPS with cert-manager TLS).
+5. **Production-like VPS Deployment**:
+   - Complete Helm chart with `values-local.yaml` (Kind) and `values-prod.yaml` (VPS with cert-manager TLS).
+6. **Ultra-Premium Cloud SaaS Dashboard (Linear / Vercel Aesthetic)**:
+   - Enterprise 2-tier sticky navigation with zero horizontal screen overflow across all desktop and laptop viewports.
+   - Symmetrical 2x2 side-by-side MCP upstream card grid with equal-height cards and interactive hover elevation.
+   - Live animated green radar pulse status indicators (`@keyframes pulse-dot`).
+   - Interactive one-click Unified Endpoint copy box with visual clipboard feedback (`✓ Copied`).
+   - Cyan neon latency micro-badges (`⚡ 2ms latency`).
+7. **Authentic E-Commerce Product Photography**:
+   - Replaced all default WooCommerce grey placeholders with studio-grade commercial product photography across all catalog items with automated responsive thumbnail srcsets (`150x150` to `1024w`).
 

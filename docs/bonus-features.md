@@ -70,3 +70,41 @@ When admins add or update upstream MCP servers:
 ### AES-256-GCM Credential Encryption at Rest
 - Upstream credentials (bearer tokens, custom auth headers) are encrypted using authenticated **AES-256-GCM** before writing to SQLite persistent storage.
 - Credentials are decrypted in-memory only when the Gateway dispatches outbound HTTP requests to upstream MCP servers, and are never exposed in logs or API responses.
+
+---
+
+## 5. Ultra-Premium Cloud SaaS Dashboard (Linear / Vercel Aesthetic)
+
+### Architecture & UI/UX Design System
+The React dashboard (`apps/dashboard`) is built with state-of-the-art modern cloud SaaS design patterns inspired by Linear, Vercel, and Raycast:
+
+- **Enterprise 2-Tier Sticky Navigation**:
+  - **Tier 1 (Top Bar)**: Anchors brand identity, Kubernetes runtime badge, direct storefront launcher (`🛍️ Open Storefront ↗`), and the active user identity switcher (`Administrator (ADMIN)` + role badge).
+  - **Tier 2 (Sub-Navigation Bar)**: Houses all 7 platform tabs (`🔌 MCP Servers`, `🤖 AI Chat Agent`, `🔑 Team & API Keys`, `📜 Audit Log`, `🏪 Stores`, `📊 Metrics`, `🛡️ RBAC & Security`) with glassmorphic containers and glowing active indicators.
+  - **Zero Horizontal Overflow**: Guaranteed fit across desktop, laptop, and tablet viewports without screen clipping or horizontal scrollbars (`overflow-x: hidden; max-width: 100vw;`).
+- **Balanced 2x2 Upstream Grid**:
+  - Replaced single-column stacking with a balanced 2-column side-by-side grid (`repeat(2, 1fr)`), presenting upstream servers symmetrically with equal card heights.
+- **Pulsing Radar Status Dots**:
+  - Connected upstream servers feature animated green radar dots (`@keyframes pulse-dot`) with emerald drop-glows (`#10b981`).
+- **One-Click Unified Endpoint Copy Box**:
+  - The hero section includes an interactive endpoint copy chip (`http://dashboard.127.0.0.1.nip.io/mcp`) with instant clipboard feedback (`✓ Copied`).
+- **Neon Latency Badges**:
+  - Upstream latency metrics are rendered in cyan neon micro-badges (`⚡ 2ms latency`).
+
+---
+
+## 6. Authentic Storefront Media & Product Catalog
+
+### High-Resolution Commercial Product Photography
+Instead of default WooCommerce grey placeholder icons, the store features studio-grade commercial product photography across the entire catalog:
+
+- **Featured Products**:
+  1. **Neon Cyber Headphones** ($49.99): Futuristic cyberpunk over-ear headphones with cyan and violet neon LED strips.
+  2. **Laser Engraved Desk Pad** ($34.50): Luxury dark leather desk mat with laser-engraved geometric circuitry patterns.
+  3. **Admin Special Keyboard** ($149.00): Custom anodized aluminum mechanical keyboard with coiled aviator cable and RGB underglow.
+  4. **Neon Cyber Wireless Headphones** ($79.99): Sleek wireless earbuds with translucent glowing cyber charging case.
+  5. **TeamBridge Engineering Hoodie** ($45.00): Luxury heavyweight black developer streetwear hoodie with embroidered tech insignia.
+  6. **Ergonomic Developer Chair** ($299.00): High-end mesh developer chair with chrome base and adjustable lumbar support.
+- **Automated Responsive Thumbnails**:
+  - All images are imported directly into the WordPress media library via WP-CLI (`wp media import --post_id=<id> --featured_image`).
+  - WooCommerce automatically generates responsive thumbnail srcsets (`150x150`, `300x300`, `600x600`, `768x768`, `1024w`) for fast, responsive rendering on all devices.
