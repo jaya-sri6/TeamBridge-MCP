@@ -1,0 +1,39 @@
+global:
+  domain: "teambridge.example.com"
+  tls: true
+  storageClass: "local-path" # or "gp3" / "hetzner-volumes" on VPS
+
+store:
+  ingress:
+    host: "store.teambridge.example.com"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+gateway:
+  replicaCount: 2 # High Availability
+  ingress:
+    host: "dashboard.teambridge.example.com"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+networkPolicies:
+  enabled: true

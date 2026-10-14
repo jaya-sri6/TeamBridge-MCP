@@ -1,0 +1,121 @@
+global:
+  domain: "127.0.0.1.nip.io"
+  tls: false
+  storageClass: "standard"
+
+store:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: teambridge/store
+    tag: latest
+    pullPolicy: IfNotPresent
+  ingress:
+    enabled: true
+    className: nginx
+    host: "store.127.0.0.1.nip.io"
+  persistence:
+    enabled: true
+    size: 2Gi
+  mariadb:
+    image:
+      repository: mariadb
+      tag: "10.11"
+      pullPolicy: IfNotPresent
+    database: wordpress
+    user: wordpress
+    persistence:
+      size: 2Gi
+  wooConsumerKey: "ck_teambridge_local_key"
+  wooConsumerSecret: "cs_teambridge_local_secret"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+gateway:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: teambridge/gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 3000
+  ingress:
+    enabled: true
+    className: nginx
+    host: "dashboard.127.0.0.1.nip.io"
+  persistence:
+    enabled: true
+    size: 1Gi
+  hmacSecret: "teambridge-super-secret-hmac-key-2026"
+  llm:
+    apiKey: ""
+    baseUrl: "https://api.openai.com/v1"
+    model: "gpt-4o-mini"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+upstreams:
+  woo:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: teambridge/woo-mcp
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      port: 8000
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+
+  tasks:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: teambridge/tasks-mcp
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      port: 8001
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+
+  utilities:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: teambridge/utilities-mcp
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      port: 8002
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 128Mi
+
+networkPolicies:
+  enabled: true

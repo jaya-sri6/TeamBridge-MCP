@@ -1,0 +1,23 @@
+{
+  "name": "teambridge-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeamBridge - Production-grade WooCommerce Hosting & Team MCP Gateway on Kubernetes",
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "keywords": [
+    "kubernetes",
+    "mcp",
+    "model-context-protocol",
+    "woocommerce",
+    "gateway"
+  ],
+  "author": "Urumi AI Candidate",
+  "license": "MIT"
+}

@@ -1,0 +1,62 @@
+{{- if .Values.upstreams.tasks.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: tasks-mcp
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: tasks-mcp
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.upstreams.tasks.service.port }}
+      targetPort: 8001
+      name: mcp
+  selector:
+    app: tasks-mcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasks-mcp
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: tasks-mcp
+spec:
+  replicas: {{ .Values.upstreams.tasks.replicaCount }}
+  selector:
+    matchLabels:
+      app: tasks-mcp
+  template:
+    metadata:
+      labels:
+        app: tasks-mcp
+        {{- include "teambridge.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: tasks-mcp
+          image: "{{ .Values.upstreams.tasks.image.repository }}:{{ .Values.upstreams.tasks.image.tag }}"
+          imagePullPolicy: {{ .Values.upstreams.tasks.image.pullPolicy }}
+          ports:
+            - containerPort: 8001
+              name: mcp
+          env:
+            - name: PORT
+              value: "8001"
+            - name: HOST
+              value: "0.0.0.0"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.upstreams.tasks.resources | nindent 12 }}
+{{- end }}

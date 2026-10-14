@@ -1,0 +1,74 @@
+{{- if .Values.upstreams.woo.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: woo-mcp
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: woo-mcp
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.upstreams.woo.service.port }}
+      targetPort: 8000
+      name: mcp
+  selector:
+    app: woo-mcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: woo-mcp
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: woo-mcp
+spec:
+  replicas: {{ .Values.upstreams.woo.replicaCount }}
+  selector:
+    matchLabels:
+      app: woo-mcp
+  template:
+    metadata:
+      labels:
+        app: woo-mcp
+        {{- include "teambridge.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: woo-mcp
+          image: "{{ .Values.upstreams.woo.image.repository }}:{{ .Values.upstreams.woo.image.tag }}"
+          imagePullPolicy: {{ .Values.upstreams.woo.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+              name: mcp
+          env:
+            - name: PORT
+              value: "8000"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: WOO_STORE_URL
+              value: "http://store:80"
+            - name: WOO_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: woo-consumer-key
+            - name: WOO_CONSUMER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: woo-consumer-secret
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.upstreams.woo.resources | nindent 12 }}
+{{- end }}

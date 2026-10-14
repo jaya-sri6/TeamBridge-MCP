@@ -1,0 +1,36 @@
+{{- if .Values.store.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: store-ingress
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+    {{- if .Values.global.tls }}
+    cert-manager.io/cluster-issuer: {{ .Values.global.certManagerClusterIssuer | default "letsencrypt-prod" | quote }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- with .Values.store.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.store.ingress.className | default "nginx" }}
+  {{- if .Values.global.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.store.ingress.host }}
+      secretName: store-tls-cert
+  {{- end }}
+  rules:
+    - host: {{ .Values.store.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: store
+                port:
+                  number: 80
+{{- end }}

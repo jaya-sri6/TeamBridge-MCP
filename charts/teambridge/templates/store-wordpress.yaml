@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress-content-pvc
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.store.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: store
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: store
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: store
+spec:
+  replicas: {{ .Values.store.replicaCount }}
+  selector:
+    matchLabels:
+      app: store
+  template:
+    metadata:
+      labels:
+        app: store
+        {{- include "teambridge.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: wordpress
+          image: "{{ .Values.store.image.repository }}:{{ .Values.store.image.tag }}"
+          imagePullPolicy: {{ .Values.store.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: WORDPRESS_DB_HOST
+              value: "mariadb:3306"
+            - name: WORDPRESS_DB_NAME
+              value: {{ .Values.store.mariadb.database | quote }}
+            - name: WORDPRESS_DB_USER
+              value: {{ .Values.store.mariadb.user | quote }}
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: mariadb-password
+            - name: WOO_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: woo-consumer-key
+            - name: WOO_CONSUMER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: woo-consumer-secret
+          volumeMounts:
+            - name: wp-content
+              mountPath: /var/www/html/wp-content
+          readinessProbe:
+            httpGet:
+              path: /wp-login.php
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /wp-login.php
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.store.resources | nindent 12 }}
+      volumes:
+        - name: wp-content
+          persistentVolumeClaim:
+            claimName: wordpress-content-pvc

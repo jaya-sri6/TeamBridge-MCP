@@ -1,0 +1,105 @@
+{{- if .Values.gateway.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gateway-data-pvc
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.gateway.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: gateway
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.gateway.service.port }}
+      targetPort: 3000
+      name: http
+  selector:
+    app: gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+    app: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+        {{- include "teambridge.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PORT
+              value: "3000"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: DB_PATH
+              value: "/app/data/teambridge.db"
+            - name: WOO_MCP_URL
+              value: "http://woo-mcp:8000/mcp"
+            - name: TASKS_MCP_URL
+              value: "http://tasks-mcp:8001/mcp"
+            - name: UTILS_MCP_URL
+              value: "http://utilities-mcp:8002/mcp"
+            - name: HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: hmac-secret
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: teambridge-secrets
+                  key: llm-api-key
+            - name: LLM_BASE_URL
+              value: {{ .Values.gateway.llm.baseUrl | quote }}
+            - name: LLM_MODEL
+              value: {{ .Values.gateway.llm.model | quote }}
+          volumeMounts:
+            - name: gateway-data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+      volumes:
+        - name: gateway-data
+          persistentVolumeClaim:
+            claimName: gateway-data-pvc
+{{- end }}

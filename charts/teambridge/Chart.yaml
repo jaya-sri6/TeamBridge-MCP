@@ -1,0 +1,15 @@
+apiVersion: v2
+name: teambridge
+description: TeamBridge - Production-grade WooCommerce Hosting & Team MCP Gateway on Kubernetes
+type: application
+version: 1.0.0
+appVersion: 1.0.0
+keywords:
+  - kubernetes
+  - mcp
+  - model-context-protocol
+  - woocommerce
+  - ai-gateway
+maintainers:
+  - name: TeamBridge Engineers
+    email: dev@teambridge.local

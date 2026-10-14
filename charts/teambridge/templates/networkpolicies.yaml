@@ -1,0 +1,77 @@
+{{- if .Values.networkPolicies.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upstream-mcp-isolation
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: ["woo-mcp", "tasks-mcp", "utilities-mcp"]
+  policyTypes:
+    - Ingress
+  ingress:
+    # Upstream MCP servers can ONLY be accessed by the Gateway pods!
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 8001
+        - protocol: TCP
+          port: 8002
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mariadb-isolation
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: mariadb
+  policyTypes:
+    - Ingress
+  ingress:
+    # Database can ONLY be accessed by WordPress store pods!
+    - from:
+        - podSelector:
+            matchLabels:
+              app: store
+      ports:
+        - protocol: TCP
+          port: 3306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: store-isolation
+  labels:
+    {{- include "teambridge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: store
+  policyTypes:
+    - Ingress
+  ingress:
+    # WordPress store accepts HTTP traffic from Ingress controller and woo-mcp (for REST API)
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app: woo-mcp
+      ports:
+        - protocol: TCP
+          port: 80
+{{- end }}

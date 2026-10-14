@@ -1,0 +1,16 @@
+global:
+  domain: "127.0.0.1.nip.io"
+  tls: false
+  storageClass: "standard"
+
+store:
+  ingress:
+    host: "store.127.0.0.1.nip.io"
+
+gateway:
+  ingress:
+    host: "dashboard.127.0.0.1.nip.io"
+  replicaCount: 1
+
+networkPolicies:
+  enabled: true
