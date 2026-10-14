@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { decryptSecret } from "./crypto.js";
 
 export interface UpstreamRecord {
   id: string;
@@ -61,14 +62,16 @@ export class UpstreamManager {
       Accept: "application/json",
     };
 
-    if (upstream.credential_type === "bearer" && upstream.credential_value) {
-      headers["Authorization"] = `Bearer ${upstream.credential_value}`;
-    } else if (upstream.credential_type === "header" && upstream.credential_value) {
+    const secretValue = upstream.credential_value ? decryptSecret(upstream.credential_value) : null;
+
+    if (upstream.credential_type === "bearer" && secretValue) {
+      headers["Authorization"] = `Bearer ${secretValue}`;
+    } else if (upstream.credential_type === "header" && secretValue) {
       try {
-        const parsed = JSON.parse(upstream.credential_value);
+        const parsed = JSON.parse(secretValue);
         Object.assign(headers, parsed);
       } catch {
-        headers["X-MCP-API-KEY"] = upstream.credential_value;
+        headers["X-MCP-API-KEY"] = secretValue;
       }
     }
     return headers;

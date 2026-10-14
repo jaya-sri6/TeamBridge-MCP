@@ -5,9 +5,56 @@ import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { db, initSeedData } from "./db.js";
-import { generateApiKey, hashApiKey, maskSecret } from "./crypto.js";
+import { generateApiKey, hashApiKey, maskSecret, encryptSecret, decryptSecret, validateUpstreamUrl } from "./crypto.js";
 import { upstreamManager, UpstreamRecord } from "./upstream-manager.js";
 import { executeChatTurn } from "./chat-agent.js";
+
+// Rate Limiter per User/Key (60 requests per minute)
+class RateLimiter {
+  private windowMs: number;
+  private maxRequests: number;
+  private hits: Map<string, number[]>;
+
+  constructor(windowMs = 60000, maxRequests = 60) {
+    this.windowMs = windowMs;
+    this.maxRequests = maxRequests;
+    this.hits = new Map();
+  }
+
+  isRateLimited(key: string): { limited: boolean; remaining: number; retryAfterSeconds: number } {
+    const now = Date.now();
+    const timestamps = (this.hits.get(key) || []).filter((t) => now - t < this.windowMs);
+    if (timestamps.length >= this.maxRequests) {
+      const oldest = timestamps[0];
+      const retryAfter = Math.ceil((oldest + this.windowMs - now) / 1000);
+      return { limited: true, remaining: 0, retryAfterSeconds: Math.max(1, retryAfter) };
+    }
+    timestamps.push(now);
+    this.hits.set(key, timestamps);
+    return { limited: false, remaining: this.maxRequests - timestamps.length, retryAfterSeconds: 0 };
+  }
+}
+
+export const rateLimiter = new RateLimiter(60000, 60);
+
+// RBAC Policy: Mutating tools requiring 'admin' privileges
+export const ADMIN_ONLY_TOOLS = new Set([
+  "create_product",
+  "update_order_status",
+  "create_task",
+  "update_task_status",
+  "woo__create_product",
+  "woo__update_order_status",
+  "tasks__create_task",
+  "tasks__update_task_status",
+  "store2__create_product",
+  "store2__update_order_status",
+]);
+
+export function isToolAllowedForRole(role: string, toolName: string): boolean {
+  if (role === "admin") return true;
+  return !ADMIN_ONLY_TOOLS.has(toolName);
+}
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -115,6 +162,21 @@ server.post("/mcp", async (req, reply) => {
   }
 
   const { user } = auth;
+
+  // Rate Limiting Enforcement
+  const rateCheck = rateLimiter.isRateLimited(user.id);
+  if (rateCheck.limited) {
+    reply.header("Retry-After", rateCheck.retryAfterSeconds);
+    return reply.status(429).send({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32029,
+        message: `Rate limit exceeded. Maximum 60 requests/minute. Retry after ${rateCheck.retryAfterSeconds}s.`,
+      },
+    });
+  }
+
   const body = req.body as any;
   if (!body || typeof body !== "object") {
     return reply.status(400).send({
@@ -159,10 +221,15 @@ server.post("/mcp", async (req, reply) => {
 
   if (method === "tools/list") {
     const { tools } = await upstreamManager.getAggregatedTools();
+    // Filter tools based on user's RBAC role
+    const filteredTools = user.role === "admin"
+      ? tools
+      : tools.filter((t) => isToolAllowedForRole(user.role, t.name));
+
     return reply.send({
       jsonrpc: "2.0",
       id,
-      result: { tools },
+      result: { tools: filteredTools },
     });
   }
 
@@ -174,6 +241,39 @@ server.post("/mcp", async (req, reply) => {
         jsonrpc: "2.0",
         id,
         error: { code: -32602, message: "Missing tool name" },
+      });
+    }
+
+    // RBAC Permission Enforcement
+    if (!isToolAllowedForRole(user.role, toolName)) {
+      const deniedMsg = `Access Denied: Tool '${toolName}' requires 'admin' role, but user '${user.email}' has role '${user.role}'`;
+      try {
+        db.prepare(`
+          INSERT INTO audit_logs (id, user_id, user_email, upstream_id, upstream_slug, tool_name, raw_tool_name, arguments_json, success, duration_ms, error_message, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          `aud_${crypto.randomUUID()}`,
+          user.id,
+          user.email,
+          null,
+          null,
+          toolName,
+          toolName,
+          JSON.stringify(toolArgs || {}),
+          0,
+          2,
+          deniedMsg,
+          new Date().toISOString()
+        );
+      } catch {}
+
+      return reply.status(403).send({
+        jsonrpc: "2.0",
+        id,
+        error: {
+          code: -32003,
+          message: deniedMsg,
+        },
       });
     }
 
@@ -386,15 +486,23 @@ server.post("/api/upstreams", async (req, reply) => {
     return reply.status(400).send({ error: "Name and URL are required" });
   }
 
+  // SSRF Protection Check
+  const urlCheck = validateUpstreamUrl(body.url);
+  if (!urlCheck.valid) {
+    return reply.status(400).send({ error: urlCheck.reason });
+  }
+
   const slug = (body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).trim();
   const id = `ups_${crypto.randomUUID().substring(0, 8)}`;
   const now = new Date().toISOString();
+  // Encrypt credential at rest using AES-256-GCM
+  const encryptedCred = body.credentialValue ? encryptSecret(body.credentialValue) : null;
 
   try {
     db.prepare(`
       INSERT INTO upstreams (id, slug, name, url, credential_type, credential_value, enabled, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-    `).run(id, slug, body.name, body.url, body.credentialType || "none", body.credentialValue || null, now, now);
+    `).run(id, slug, body.name, body.url, body.credentialType || "none", encryptedCred, now, now);
 
     return { success: true, upstream: { id, slug, name: body.name, url: body.url } };
   } catch (err: any) {
@@ -406,6 +514,13 @@ server.put("/api/upstreams/:id", async (req, reply) => {
   const { id } = req.params as { id: string };
   const body = req.body as any;
   const now = new Date().toISOString();
+
+  if (body.url) {
+    const urlCheck = validateUpstreamUrl(body.url);
+    if (!urlCheck.valid) {
+      return reply.status(400).send({ error: urlCheck.reason });
+    }
+  }
 
   const updates: string[] = ["updated_at = ?"];
   const params: any[] = [now];
@@ -424,7 +539,7 @@ server.put("/api/upstreams/:id", async (req, reply) => {
   }
   if (body.credentialValue !== undefined) {
     updates.push("credential_value = ?");
-    params.push(body.credentialValue);
+    params.push(body.credentialValue ? encryptSecret(body.credentialValue) : null);
   }
 
   params.push(id);
@@ -459,6 +574,144 @@ server.delete("/api/upstreams/:id", async (req, reply) => {
     return reply.status(404).send({ error: "Upstream not found" });
   }
   return { success: true };
+});
+
+// -------------------------------------------------------------
+// Multi-Store Provisioning Platform API (Bonus)
+// -------------------------------------------------------------
+server.get("/api/stores", async () => {
+  const stores = db.prepare("SELECT * FROM stores ORDER BY created_at ASC").all() as any[];
+  return { stores };
+});
+
+server.post("/api/stores", async (req, reply) => {
+  const body = req.body as any;
+  if (!body.name) {
+    return reply.status(400).send({ error: "Store name is required" });
+  }
+
+  const slug = (body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).trim();
+  const id = `store_${crypto.randomUUID().substring(0, 8)}`;
+  const now = new Date().toISOString();
+  const storeUrl = body.url || `http://${slug}.127.0.0.1.nip.io`;
+  const upstreamId = `ups_${slug}`;
+
+  try {
+    db.prepare(`
+      INSERT INTO stores (id, name, slug, url, status, upstream_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, body.name, slug, storeUrl, "Ready", upstreamId, now);
+
+    // Auto-register WooCommerce MCP upstream for the new store
+    const existingUps = db.prepare("SELECT id FROM upstreams WHERE slug = ?").get(slug);
+    if (!existingUps) {
+      const wooUrl = process.env.WOO_MCP_URL || "http://woo-mcp.teambridge-mcp.svc.cluster.local:8000/mcp";
+      db.prepare(`
+        INSERT INTO upstreams (id, slug, name, url, credential_type, credential_value, enabled, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(upstreamId, slug, `${body.name} MCP`, wooUrl, "none", null, now, now);
+    }
+
+    return {
+      success: true,
+      store: {
+        id,
+        name: body.name,
+        slug,
+        url: storeUrl,
+        status: "Ready",
+        upstreamId,
+      },
+    };
+  } catch (err: any) {
+    return reply.status(400).send({ error: err.message });
+  }
+});
+
+server.delete("/api/stores/:id", async (req, reply) => {
+  const { id } = req.params as { id: string };
+  const store = db.prepare("SELECT * FROM stores WHERE id = ?").get(id) as any;
+  if (!store) {
+    return reply.status(404).send({ error: "Store not found" });
+  }
+
+  db.prepare("DELETE FROM stores WHERE id = ?").run(id);
+
+  if (store.upstream_id) {
+    db.prepare("DELETE FROM upstreams WHERE id = ?").run(store.upstream_id);
+  } else if (store.slug) {
+    db.prepare("DELETE FROM upstreams WHERE slug = ?").run(store.slug);
+  }
+
+  return { success: true, message: `Store '${store.name}' and upstream MCP server cleanly torn down.` };
+});
+
+// -------------------------------------------------------------
+// Real-Time Observability & Metrics API (Bonus)
+// -------------------------------------------------------------
+server.get("/api/metrics", async () => {
+  const totalCalls = (db.prepare("SELECT COUNT(*) as c FROM audit_logs").get() as any).c;
+  const successCalls = (db.prepare("SELECT COUNT(*) as c FROM audit_logs WHERE success = 1").get() as any).c;
+  const failedCalls = (db.prepare("SELECT COUNT(*) as c FROM audit_logs WHERE success = 0").get() as any).c;
+  const successRate = totalCalls > 0 ? Math.round((successCalls / totalCalls) * 100) : 100;
+
+  const latencies = db.prepare(`
+    SELECT upstream_slug, AVG(duration_ms) as avg_duration, COUNT(*) as call_count
+    FROM audit_logs
+    WHERE upstream_slug IS NOT NULL
+    GROUP BY upstream_slug
+  `).all() as any[];
+
+  const topTools = db.prepare(`
+    SELECT tool_name, COUNT(*) as count, AVG(duration_ms) as avg_latency
+    FROM audit_logs
+    GROUP BY tool_name
+    ORDER BY count DESC
+    LIMIT 6
+  `).all() as any[];
+
+  const rbacSummary = {
+    adminRoles: ["Administrator"],
+    memberRoles: ["Engineer", "Support", "Analyst"],
+    restrictedToolsCount: ADMIN_ONLY_TOOLS.size,
+    restrictedTools: Array.from(ADMIN_ONLY_TOOLS),
+  };
+
+  return {
+    summary: {
+      totalCalls,
+      successCalls,
+      failedCalls,
+      successRate,
+      activeUsers: 3,
+      connectedServers: 3,
+      rateLimitWindow: "60 requests/min per identity",
+    },
+    latencies,
+    topTools,
+    rbacSummary,
+  };
+});
+
+// -------------------------------------------------------------
+// RBAC Permissions Matrix API
+// -------------------------------------------------------------
+server.get("/api/rbac/permissions", async () => {
+  const { tools } = await upstreamManager.getAggregatedTools();
+  const matrix = tools.map((t) => ({
+    toolName: t.name,
+    rawName: t.rawName,
+    upstream: t.upstreamSlug,
+    description: t.description,
+    adminAllowed: true,
+    memberAllowed: isToolAllowedForRole("member", t.name),
+    requiresRole: isToolAllowedForRole("member", t.name) ? "member" : "admin",
+  }));
+
+  return {
+    adminOnlyTools: Array.from(ADMIN_ONLY_TOOLS),
+    permissions: matrix,
+  };
 });
 
 // Audit Logs

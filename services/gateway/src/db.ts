@@ -65,9 +65,20 @@ db.exec(`
     timestamp TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS stores (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    url TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Ready',
+    upstream_id TEXT,
+    created_at TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
   CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
   CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_stores_slug ON stores(slug);
 `);
 
 // Seed Initial Data if empty
@@ -120,4 +131,23 @@ export function initSeedData() {
 
     console.log("Seeded default 3 upstream MCP servers (woo, tasks, utilities)");
   }
+
+  const storeCount = (db.prepare("SELECT COUNT(*) as count FROM stores").get() as any).count;
+  if (storeCount === 0) {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO stores (id, name, slug, url, status, upstream_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      "store_primary",
+      "Meridian Flagship Store",
+      "primary",
+      process.env.STORE_URL || "http://store.127.0.0.1.nip.io",
+      "Ready",
+      "ups_woo",
+      now
+    );
+    console.log("Seeded primary store record (Meridian Flagship Store)");
+  }
 }
+
