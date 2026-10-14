@@ -275,7 +275,7 @@ node scripts/verify-dod.mjs
 ├── docs/
 │   ├── system-design.md       # Architecture choices, tool routing, and VPS strategy
 │   ├── threat-model.md        # Security threat model & cross-tenant isolation
-│   └── standout-features.md   # Differentiators: NetworkPolicies, Dual LLM engine
+│   └── bonus-features.md      # Multi-store, RBAC, Observability, and Security Hardening
 ├── scripts/
 │   ├── teambridge-init.php    # WooCommerce auto-seeder mu-plugin
 │   └── verify-dod.mjs         # Automated Definition of Done verification test
@@ -284,10 +284,23 @@ node scripts/verify-dod.mjs
 
 ---
 
-## 🌟 Stand-Out Differentiators Implemented
+## 🌟 Bonus Features & Stand-Out Differentiators Implemented
 
-1. **Production-like VPS Deployment**: Complete Helm values architecture supporting both local Kind (`values-local.yaml`) and production VPS (`values-prod.yaml`) with cert-manager TLS annotations.
-2. **Security Hardening**: Enforced Calico `NetworkPolicies` denying external traffic to upstreams and database, containers running as non-root, and hashed HMAC credentials.
-3. **High Availability Multi-Replica Gateway**: Stateless Streamable HTTP session routing with SQLite WAL persistence.
-4. **Dual-Mode AI Chat Agent**: Fully operational offline via deterministic heuristics AND compatible with cloud LLMs (OpenAI, Claude, Groq) via standard API key configuration.
-5. **Tool Name Collision Scheme**: Canonical namespacing (`${slug}__${tool}`) with smart transparent aliasing for unique tools.
+1. **Multi-Store Provisioning Platform (Primary Bonus)**:
+   - Dynamic store provisioning from Dashboard and API.
+   - Automatic WooCommerce MCP upstream registration with isolated tool prefixes (`store2__...`).
+   - Cross-store order comparison queries in the AI Chat Agent.
+   - Clean teardown with automatic resource and upstream unregistration.
+2. **Fine-Grained Tool Permissions & RBAC**:
+   - Role-based separation: `admin` (read + write) vs `member` (read-only).
+   - Dynamic filtering in `tools/list`: restricted tools are hidden from non-admin users.
+   - Unauthorized executions blocked with `403 Forbidden` and logged as security violations.
+3. **Real-Time Observability & Rate Limiting**:
+   - Live telemetry dashboard tracking p50/p95 latency per upstream and error rates.
+   - Token-bucket sliding window rate limiting (60 requests/minute per caller) with `429 Too Many Requests` and `Retry-After`.
+4. **Enterprise Security Hardening**:
+   - **SSRF Defense**: Active validation blocking AWS/GCP/Azure metadata services (`169.254.169.254`) and restricted ports on upstream registration.
+   - **AES-256-GCM Encryption at Rest**: Upstream secrets encrypted in SQLite and decrypted in-memory only.
+   - **Zero-Trust NetworkPolicies**: Calico policies isolating database and upstreams from unauthorized traffic.
+5. **Production-like VPS Deployment**: Complete Helm chart with `values-local.yaml` (Kind) and `values-prod.yaml` (VPS with cert-manager TLS).
+
