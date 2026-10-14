@@ -51,6 +51,8 @@ export async function executeChatTurn(
         resolvedTool = `utilities__${resolvedTool}`;
       } else if (toolMap.has(`tasks__${resolvedTool}`)) {
         resolvedTool = `tasks__${resolvedTool}`;
+      } else if (toolMap.has(`store2__${resolvedTool}`)) {
+        resolvedTool = `store2__${resolvedTool}`;
       }
     }
 
@@ -284,7 +286,24 @@ export async function executeChatTurn(
     };
   }
 
-  // 2. Orders query intent ("orders came in today", "what orders", "recent orders")
+  // 2. Gear & Hardware Store intent (store2)
+  if (promptLower.includes("gear") || promptLower.includes("hardware") || promptLower.includes("store2")) {
+    if (promptLower.includes("order")) {
+      const toolResult = await runToolAsUser("store2__list_orders", { per_page: 5 });
+      return {
+        message: `📦 **Gear & Hardware Store Orders (store2)**:\n\nRetrieved live orders from secondary store tenant (\`ups_store2\`):\n\n${toolResult?.content?.[0]?.text || "No orders found in Gear Store."}`,
+        toolCalls: executedTools,
+      };
+    } else {
+      const toolResult = await runToolAsUser("store2__list_products", { per_page: 5 });
+      return {
+        message: `🏪 **Gear & Hardware Store Catalog (store2)**:\n\nRetrieved live products via secondary store MCP upstream (\`ups_store2\`):\n\n${toolResult?.content?.[0]?.text || "[]"}`,
+        toolCalls: executedTools,
+      };
+    }
+  }
+
+  // 3. Orders query intent ("orders came in today", "what orders", "recent orders")
   if (promptLower.includes("order")) {
     const isToday = promptLower.includes("today");
     const toolResult = await runToolAsUser("list_orders", {
@@ -321,7 +340,7 @@ export async function executeChatTurn(
     };
   }
 
-  // 3. Products list query intent
+  // 4. Products list query intent
   if (promptLower.includes("list") && promptLower.includes("product")) {
     const toolResult = await runToolAsUser("list_products", { per_page: 5 });
     return {
@@ -330,7 +349,7 @@ export async function executeChatTurn(
     };
   }
 
-  // 4. Tasks intent
+  // 5. Tasks intent
   if (promptLower.includes("task")) {
     const toolResult = await runToolAsUser("tasks__list_tasks", {});
     return {
@@ -339,11 +358,36 @@ export async function executeChatTurn(
     };
   }
 
-  // 5. Math / calculation intent
+  // 6. Math / calculation intent
   if (promptLower.includes("calculate") || promptLower.includes("math") || /[\d+\-*/]/.test(lastUserMessage)) {
     const toolResult = await runToolAsUser("utilities__calculate_math", { expression: lastUserMessage });
     return {
       message: `Calculation completed via Utilities MCP:\n\n${toolResult?.content?.[0]?.text || ""}`,
+      toolCalls: executedTools,
+    };
+  }
+
+  // 7. Currency conversion intent
+  if (promptLower.includes("convert") || promptLower.includes("currency") || promptLower.includes("usd to eur") || promptLower.includes("eur to usd")) {
+    const fromMatch = lastUserMessage.match(/\b(USD|EUR|GBP|JPY|CAD|AUD)\b/i);
+    const toMatch = lastUserMessage.match(/(?:to|in)\s+\b(USD|EUR|GBP|JPY|CAD|AUD)\b/i);
+    const amountMatch = lastUserMessage.match(/\b(\d+(\.\d{1,2})?)\b/);
+    const from = fromMatch ? fromMatch[1].toUpperCase() : "USD";
+    const to = toMatch ? toMatch[1].toUpperCase() : "EUR";
+    const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
+
+    const toolResult = await runToolAsUser("utilities__convert_currency", { amount, from, to });
+    return {
+      message: `💱 **Currency Conversion via Utilities MCP**:\n\n${toolResult?.content?.[0]?.text || ""}`,
+      toolCalls: executedTools,
+    };
+  }
+
+  // 8. System time intent
+  if (promptLower.includes("time") || promptLower.includes("date") || promptLower.includes("clock")) {
+    const toolResult = await runToolAsUser("utilities__get_system_time", {});
+    return {
+      message: `🕒 **Cluster System Time via Utilities MCP**:\n\n${toolResult?.content?.[0]?.text || ""}`,
       toolCalls: executedTools,
     };
   }

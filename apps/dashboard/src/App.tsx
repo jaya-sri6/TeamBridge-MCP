@@ -539,7 +539,21 @@ export function App() {
               </div>
 
               {/* Sample Prompts */}
-              <div style={{ display: "flex", gap: "0.5rem", padding: "0.5rem 1.25rem", background: "rgba(0,0,0,0.2)", overflowX: "auto" }}>
+              <div style={{ display: "flex", gap: "0.5rem", padding: "0.6rem 1.25rem", background: "rgba(0,0,0,0.25)", overflowX: "auto", borderTop: "1px solid var(--border-color)" }}>
+                <button
+                  className="tool-tag"
+                  style={{ cursor: "pointer", color: "#38bdf8", borderColor: "rgba(56, 189, 248, 0.4)" }}
+                  onClick={() => setChatInput("List products in Gear & Hardware Store")}
+                >
+                  ⚙️ Query Gear & Hardware Store
+                </button>
+                <button
+                  className="tool-tag"
+                  style={{ cursor: "pointer", color: "#a78bfa", borderColor: "rgba(167, 139, 250, 0.4)" }}
+                  onClick={() => setChatInput("Compare orders across stores")}
+                >
+                  🏪 Compare Multi-Store Orders
+                </button>
                 <button
                   className="tool-tag"
                   style={{ cursor: "pointer" }}
@@ -552,21 +566,35 @@ export function App() {
                   style={{ cursor: "pointer" }}
                   onClick={() => setChatInput("What orders came in today?")}
                 >
-                  💡 Check Today's Orders
+                  📦 Check Today's Orders
                 </button>
                 <button
                   className="tool-tag"
                   style={{ cursor: "pointer" }}
                   onClick={() => setChatInput("List all open operational tasks")}
                 >
-                  💡 Query Tasks MCP
+                  📋 Query Tasks MCP
                 </button>
                 <button
                   className="tool-tag"
                   style={{ cursor: "pointer" }}
                   onClick={() => setChatInput("Calculate a 15% discount on a 99.99 order")}
                 >
-                  💡 Calculate Discount
+                  🧮 Calculate Discount
+                </button>
+                <button
+                  className="tool-tag"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setChatInput("Convert 100 USD to EUR")}
+                >
+                  💱 Convert Currency
+                </button>
+                <button
+                  className="tool-tag"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setChatInput("What is the current system time?")}
+                >
+                  🕒 System Time
                 </button>
               </div>
 
