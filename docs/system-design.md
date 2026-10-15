@@ -4,34 +4,102 @@
 
 TeamBridge implements a four-tier architecture running entirely within Kubernetes:
 
+```text
+                               +-------------------------------------------------+
+                               |                   CLIENT TIER                   |
+                               |  - React Dashboard (Admin / User A - Alice)     |
+                               |  - External MCP Clients (Cursor / User B - Bob) |
+                               +------------------------+------------------------+
+                                                        |
+                                                        | HTTP Request (nip.io)
+                                                        v
+                               +-------------------------------------------------+
+                               |             INGRESS & ROUTING TIER              |
+                               |  - NGINX Ingress Controller                     |
+                               |  - dashboard.127.0.0.1.nip.io                   |
+                               |  - store.127.0.0.1.nip.io                       |
+                               |  - store2.127.0.0.1.nip.io                      |
+                               +------------------------+------------------------+
+                                                        |
+                                                        | Proxy to Pod
+                                                        v
++--------------------------------------------------------------------------------------------------+
+| TIER 1: UNIFIED GATEWAY & CONTROL PLANE (teambridge-gateway)                                     |
+| • Unified MCP Endpoint : http://dashboard.127.0.0.1.nip.io/mcp                                   |
+| • Transport Protocol   : Streamable HTTP (JSON-RPC 2.0)                                          |
+| • Runtime Core         : Fastify on Node.js 22                                                   |
+| • Identity & RBAC      : Role-Based Tool Enforcement (Admin: Read/Write, Member: Read-Only)     |
+| • Key Security         : HMAC SHA-256 Hashed API Keys with Salt & Instant Revocation             |
+| • Defenses             : Active SSRF Blocking (169.254.169.254) + Token-Bucket Rate Limiter      |
+| • Local Database       : SQLite WAL on PersistentVolumeClaim (/app/data/teambridge.db)           |
++------------------------------------------------+-------------------------------------------------+
+                                                 |
+                                                 | Internal ClusterIP DNS
+                         +-----------------------+-----------------------+
+                         |                       |                       |
+                         v                       v                       v
++---------------------------------+ +-------------------------+ +----------------------------------+
+| TIER 2: WOOCOMMERCE MCP         | | TIER 2: OPERATIONS MCP  | | TIER 2: UTILITIES MCP            |
+| • Service : woo-mcp:8000        | | • Service : tasks-mcp   | | • Service : utilities-mcp:8002   |
+| • Tool Namespace: woo__...      | | • Tool Namespace:       | | • Tool Namespace: utilities__... |
+|   - woo__list_products          | |     tasks__...          | |   - utilities__calculate_math    |
+|   - woo__create_product (admin) | |   - tasks__list_tasks   | |   - utilities__convert_currency  |
+|   - woo__list_orders            | |   - tasks__create_task  | |   - utilities__get_system_time   |
+| • Multi-Tenant: store2__...     | |                         | |                                  |
++----------------+----------------+ +-------------------------+ +----------------------------------+
+                 |
+                 | REST API v3 / Basic Auth
+                 v
++--------------------------------------------------------------------------------------------------+
+| TIER 3: STOREFRONT & PERSISTENCE LAYER                                                           |
+| • Flagship Storefront  : http://store.127.0.0.1.nip.io (WordPress 6.7 + WooCommerce 9.3)         |
+| • Secondary Storefront : http://store2.127.0.0.1.nip.io (Gear & Hardware Store Tenant)           |
+| • Backend Database     : MariaDB 10.11 StatefulSet on Kubernetes PVC                             |
+| • Media & Assets       : PersistentVolumeClaim (/var/www/html/wp-content) with Studio Photos     |
+| • Test Payment Gateway : Pre-configured Cash on Delivery (COD) for zero-credential orders        |
++--------------------------------------------------------------------------------------------------+
 ```
-[Clients: Claude Code / Cursor / Dashboard]
-                      │
-           (Ingress via nip.io / DNS)
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│               Gateway & Dashboard Layer                 │
-│  - React Dashboard (Vite, Single Page Application)      │
-│  - Fastify Gateway Core (Streamable HTTP MCP + REST)    │
-│  - SQLite Database with WAL (Persistent Volume Claim)   │
-│  - Dual-mode Chat Agent (LLM Function Calling Engine)   │
-└──────────────────────────┬──────────────────────────────┘
-                           │ (Streamable HTTP / Internal ClusterIP)
-         ┌─────────────────┼──────────────────┐
-         ▼                 ▼                  ▼
-┌─────────────────┐ ┌──────────────┐ ┌─────────────────┐
-│ WooCommerce MCP │ │  Tasks MCP   │ │  Utilities MCP  │
-│  (Custom Node)  │ │ (Ops Tasks)  │ │ (Math & Time)   │
-└────────┬────────┘ └──────────────┘ └─────────────────┘
-         │ (REST API v3 Basic Auth)
-         ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Store Layer                          │
-│  - WordPress 6.7 + WooCommerce 9.3 (Apache)             │
-│  - MariaDB 10.11 StatefulSet with PVC                   │
-│  - Auto-seeder mu-plugin (COD, API Keys, Products)      │
-└─────────────────────────────────────────────────────────┘
-```
+
+### Detailed Breakdown by Tier
+
+#### 1. Ingress & Routing Tier
+* **DNS Strategy:** Uses zero-config wildcard DNS (`*.127.0.0.1.nip.io`) — no manual `/etc/hosts` or Windows hosts editing required.
+* **Ingress Controller:** NGINX Ingress routing external HTTP traffic directly into cluster pods.
+* **Public Hosts:**
+  - `http://dashboard.127.0.0.1.nip.io` (Admin UI & Gateway)
+  - `http://store.127.0.0.1.nip.io` (Flagship Store)
+  - `http://store2.127.0.0.1.nip.io` (Secondary Multi-Tenant Store)
+
+#### 2. Unified Gateway Tier (`gateway`)
+* **Core Runtime:** Fastify on Node.js 22 with Streamable HTTP MCP support.
+* **Unified Endpoint:** `http://dashboard.127.0.0.1.nip.io/mcp`
+* **Core Responsibilities:**
+  - **Tool Aggregation:** Discovers tools from all upstream servers and applies collision-proof prefixes (`woo__`, `tasks__`, `utilities__`, `store2__`).
+  - **Fine-Grained RBAC:** Filters tool listing and blocks unauthorized mutations with `HTTP 403 Forbidden`.
+  - **Token-Bucket Rate Limiter:** Enforces 60 requests/minute per identity.
+  - **Data Persistence:** SQLite with WAL mode on Kubernetes PVC storing users, HMAC-hashed API keys, and immutable audit logs.
+
+#### 3. Upstream Microservices Tier
+Three isolated upstream servers run as independent Kubernetes pods:
+* **WooCommerce MCP (`woo-mcp:8000`):** Custom TypeScript server translating MCP tool calls into WooCommerce REST API v3 queries (`list_products`, `create_product`, `list_orders`).
+* **Tasks MCP (`tasks-mcp:8001`):** Operations backlog management server (`list_tasks`, `create_task`).
+* **Utilities MCP (`utilities-mcp:8002`):** Math evaluation engine, live currency conversion, and cluster system time.
+* **Multi-Tenant Stores (`store2`):** Dynamically provisioned store tenants registering dedicated namespaces (`store2__list_products`).
+
+#### 4. Storefront & Persistence Tier
+* **Store Engine:** WordPress 6.7 and WooCommerce 9.3 running in Apache/PHP container.
+* **Database:** Dedicated **MariaDB 10.11 StatefulSet** backed by Kubernetes PersistentVolumeClaims (`wp-content` and database storage).
+* **Payment & Auth:** Automated Cash on Delivery (COD) test gateway with pre-seeded REST credentials.
+
+---
+
+### 🎙️ 15-Second Architecture Speaking Script (For Demo Video)
+
+> *"TeamBridge runs entirely on Kubernetes across four synchronized tiers:
+> First, our **Ingress and Client Tier** routes traffic from web browsers and external AI clients like Cursor using zero-friction `nip.io` domains.
+> Second, our **Unified Gateway Tier** serves as the single Streamable HTTP endpoint at `/mcp`, enforcing RBAC permissions, key authentication, and audit logging.
+> Third, our **Microservices Tier** consists of isolated upstream MCP pods for WooCommerce, Tasks, and Utilities, aggregating their tools with collision-proof namespacing.
+> And fourth, our **Storefront Tier** provides a live WordPress 6.7 and WooCommerce store backed by a MariaDB StatefulSet on persistent storage."*
 
 ---
 

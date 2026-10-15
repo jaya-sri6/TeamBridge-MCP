@@ -749,6 +749,157 @@ server.post("/api/chat", async (req, reply) => {
   return response;
 });
 
+// -------------------------------------------------------------
+// OAuth 2.0 Authorization Server Endpoints (RFC 6749 / RFC 8414)
+// -------------------------------------------------------------
+interface OAuthCodeEntry {
+  code: string;
+  userId: string;
+  clientId: string;
+  redirectUri: string;
+  expiresAt: number;
+}
+const oauthAuthCodes = new Map<string, OAuthCodeEntry>();
+
+server.get("/.well-known/oauth-authorization-server", async (req) => {
+  const host = req.headers.host || "dashboard.127.0.0.1.nip.io";
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  const baseUrl = `${proto}://${host}`;
+  return {
+    issuer: baseUrl,
+    authorization_endpoint: `${baseUrl}/oauth/authorize`,
+    token_endpoint: `${baseUrl}/oauth/token`,
+    userinfo_endpoint: `${baseUrl}/oauth/userinfo`,
+    response_types_supported: ["code", "token"],
+    grant_types_supported: ["authorization_code", "client_credentials"],
+    token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
+    scopes_supported: ["mcp:tools", "openid", "profile"],
+  };
+});
+
+server.get("/.well-known/openid-configuration", async (req) => {
+  const host = req.headers.host || "dashboard.127.0.0.1.nip.io";
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  const baseUrl = `${proto}://${host}`;
+  return {
+    issuer: baseUrl,
+    authorization_endpoint: `${baseUrl}/oauth/authorize`,
+    token_endpoint: `${baseUrl}/oauth/token`,
+    userinfo_endpoint: `${baseUrl}/oauth/userinfo`,
+    response_types_supported: ["code", "token"],
+    grant_types_supported: ["authorization_code", "client_credentials"],
+    subject_types_supported: ["public"],
+  };
+});
+
+server.get("/oauth/authorize", async (req, reply) => {
+  const query = req.query as any;
+  const clientId = query.client_id || "mcp_client";
+  const redirectUri = query.redirect_uri || "";
+  const state = query.state || "";
+  let selectedUserId = query.user_id || "user_bob";
+  if (selectedUserId === "usr_bob") selectedUserId = "user_bob";
+  if (selectedUserId === "usr_alice") selectedUserId = "user_alice";
+
+  const code = `tb_code_${crypto.randomBytes(16).toString("hex")}`;
+  oauthAuthCodes.set(code, {
+    code,
+    userId: selectedUserId,
+    clientId,
+    redirectUri,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+
+  if (redirectUri) {
+    const sep = redirectUri.includes("?") ? "&" : "?";
+    return reply.redirect(`${redirectUri}${sep}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
+  }
+
+  reply.type("text/html").send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>TeamBridge OAuth 2.0 Authorization</title>
+      <meta charset="utf-8" />
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 32px; max-width: 480px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h2 { margin-top: 0; color: #38bdf8; }
+        .badge { display: inline-block; padding: 4px 10px; background: #0284c7; color: white; border-radius: 6px; font-size: 12px; margin-bottom: 16px; font-weight: bold; }
+        .code-box { background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #475569; font-family: monospace; font-size: 14px; word-break: break-all; margin: 16px 0; color: #4ade80; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; cursor: pointer; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <span class="badge">TeamBridge OAuth 2.0 Gateway</span>
+        <h2>Authorization Successful</h2>
+        <p>Client application <code>${clientId}</code> authorized for <strong>${selectedUserId === "user_alice" ? "Alice (Member)" : "Bob (Administrator)"}</strong>.</p>
+        <p style="font-size: 13px; color: #94a3b8;">Generated Authorization Code:</p>
+        <div class="code-box">${code}</div>
+        <p style="font-size: 13px; color: #94a3b8;">Exchange this code at <code>POST /oauth/token</code> for a Bearer Access Token.</p>
+        <a href="/" class="btn">Return to Dashboard</a>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+server.post("/oauth/token", async (req, reply) => {
+  const body = (req.body || {}) as any;
+  const grantType = body.grant_type || "authorization_code";
+  const code = body.code;
+
+  let targetUserId = "user_bob";
+
+  if (grantType === "authorization_code") {
+    if (!code) {
+      return reply.status(400).send({ error: "invalid_request", error_description: "Missing code parameter" });
+    }
+    const authEntry = oauthAuthCodes.get(code);
+    if (!authEntry || authEntry.expiresAt < Date.now()) {
+      return reply.status(400).send({ error: "invalid_grant", error_description: "Authorization code invalid or expired" });
+    }
+    targetUserId = authEntry.userId;
+    oauthAuthCodes.delete(code);
+  } else if (grantType === "client_credentials") {
+    targetUserId = "user_bob";
+  }
+
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(targetUserId) as any;
+  if (!user) {
+    return reply.status(400).send({ error: "invalid_grant", error_description: "User not found" });
+  }
+
+  const seedKey = targetUserId === "user_alice" ? "tb_live_alice1234567890abcdef123456" : "tb_live_bob1234567890abcdef123456";
+
+  return {
+    access_token: seedKey,
+    token_type: "Bearer",
+    expires_in: 86400,
+    scope: "mcp:tools",
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    },
+  };
+});
+
+server.get("/oauth/userinfo", async (req, reply) => {
+  const auth = authenticateRequest(req);
+  if (!auth) {
+    return reply.status(401).send({ error: "unauthorized" });
+  }
+  return {
+    sub: auth.user.id,
+    name: auth.user.name,
+    email: auth.user.email,
+    role: auth.user.role,
+  };
+});
+
 async function start() {
   try {
     await server.listen({ port: PORT, host: HOST });

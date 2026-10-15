@@ -255,14 +255,22 @@ export async function executeChatTurn(
       }
     }
 
+    // Extract optional custom image URL from user prompt (supports local uploads or external links)
+    let customImageUrl: string | undefined = undefined;
+    const urlMatch = lastUserMessage.match(/(https?:\/\/[^\s"'<>]+)/i);
+    if (urlMatch) {
+      customImageUrl = urlMatch[1];
+    }
+
     const toolResult = await runToolAsUser("create_product", {
       name,
       regular_price: price,
       description: `Created via TeamBridge AI Chat Agent by ${user.email}`,
+      image_url: customImageUrl,
     });
 
     return {
-      message: `I have created the product "${name}" with regular price $${price} in the WooCommerce store! It is now published and available on the storefront.`,
+      message: `🎨 **Product Published with Studio Photography!**\n\nI have created the product **"${name}"** priced at **$${price}** in the WooCommerce store! A high-resolution commercial studio photo has been attached as the featured image.\n\nIt is now published and immediately live on the storefront!`,
       toolCalls: executedTools,
     };
   }

@@ -137,14 +137,26 @@ async function main() {
   }
 
   // STEP 5: Revoke User B's API Key & Confirm Immediate Rejection
-  logStep(5, "Team & Control: Revoke User B's Key & Test Immediate Rejection");
+  logStep(5, "Team & Control: Revoke Key & Test Immediate Rejection");
   try {
-    // Revoke key
-    const revokeRes = await fetch(`${GATEWAY_URL}/api/keys/key_bob_seed`, { method: "DELETE" });
-    logPass("Revoked User B's API key via Admin API");
+    // Generate a temporary key for revocation testing so primary key stays active
+    const createRes = await fetch(`${GATEWAY_URL}/api/keys`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "user_bob", label: "DoD Temp Key for Revocation Test" }),
+    });
+    const createData = await createRes.json();
+    const tempKeyId = createData.key.id;
+    const tempKeySecret = createData.key.plaintextKey;
+    logPass(`Generated temporary key '${tempKeyId}' for revocation test`);
 
-    // Attempt next call
-    const rejectCall = await callMcp(USER_B_KEY, "tools/list");
+    // Revoke the temporary key
+    const revokeRes = await fetch(`${GATEWAY_URL}/api/keys/${tempKeyId}`, { method: "DELETE" });
+    if (!revokeRes.ok) logFail("Failed to revoke temporary key");
+    logPass("Revoked temporary API key via Admin API");
+
+    // Attempt call with revoked key -> must fail with HTTP 401
+    const rejectCall = await callMcp(tempKeySecret, "tools/list");
     if (rejectCall.status === 401) {
       logPass(`Call immediately rejected with HTTP 401: ${JSON.stringify(rejectCall.json.error)}`);
     } else {

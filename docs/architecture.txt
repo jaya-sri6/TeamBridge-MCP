@@ -1,0 +1,87 @@
+================================================================================
+           ⚡ TEAMBRIDGE MCP GATEWAY - SYSTEM ARCHITECTURE (4 TIERS)
+================================================================================
+
+                               +-------------------------------------------------+
+                               |                   CLIENT TIER                   |
+                               |  - React Dashboard (Admin / User A - Alice)     |
+                               |  - External MCP Clients (Cursor / User B - Bob) |
+                               +------------------------+------------------------+
+                                                        |
+                                                        | HTTP Request (nip.io)
+                                                        v
+                               +-------------------------------------------------+
+                               |             INGRESS & ROUTING TIER              |
+                               |  - NGINX Ingress Controller                     |
+                               |  - dashboard.127.0.0.1.nip.io                   |
+                               |  - store.127.0.0.1.nip.io                       |
+                               |  - store2.127.0.0.1.nip.io                      |
+                               +------------------------+------------------------+
+                                                        |
+                                                        | Proxy to Pod
+                                                        v
++--------------------------------------------------------------------------------------------------+
+| TIER 1: UNIFIED GATEWAY & CONTROL PLANE (teambridge-gateway)                                     |
+| • Unified MCP Endpoint : http://dashboard.127.0.0.1.nip.io/mcp                                   |
+| • Transport Protocol   : Streamable HTTP (JSON-RPC 2.0)                                          |
+| • Runtime Core         : Fastify on Node.js 22                                                   |
+| • Identity & RBAC      : Role-Based Tool Enforcement (Admin: Read/Write, Member: Read-Only)     |
+| • Key Security         : HMAC SHA-256 Hashed API Keys with Salt & Instant Revocation             |
+| • Defenses             : Active SSRF Blocking (169.254.169.254) + Token-Bucket Rate Limiter      |
+| • Local Database       : SQLite WAL on PersistentVolumeClaim (/app/data/teambridge.db)           |
++------------------------------------------------+-------------------------------------------------+
+                                                 |
+                                                 | Internal ClusterIP DNS
+                         +-----------------------+-----------------------+
+                         |                       |                       |
+                         v                       v                       v
++---------------------------------+ +-------------------------+ +----------------------------------+
+| TIER 2: WOOCOMMERCE MCP         | | TIER 2: OPERATIONS MCP  | | TIER 2: UTILITIES MCP            |
+| • Service : woo-mcp:8000        | | • Service : tasks-mcp   | | • Service : utilities-mcp:8002   |
+| • Tool Namespace: woo__...      | | • Tool Namespace:       | | • Tool Namespace: utilities__... |
+|   - woo__list_products          | |     tasks__...          | |   - utilities__calculate_math    |
+|   - woo__create_product (admin) | |   - tasks__list_tasks   | |   - utilities__convert_currency  |
+|   - woo__list_orders            | |   - tasks__create_task  | |   - utilities__get_system_time   |
+| • Multi-Tenant: store2__...     | |                         | |                                  |
++----------------+----------------+ +-------------------------+ +----------------------------------+
+                 |
+                 | REST API v3 / Basic Auth
+                 v
++--------------------------------------------------------------------------------------------------+
+| TIER 3: STOREFRONT & PERSISTENCE LAYER                                                           |
+| • Flagship Storefront  : http://store.127.0.0.1.nip.io (WordPress 6.7 + WooCommerce 9.3)         |
+| • Secondary Storefront : http://store2.127.0.0.1.nip.io (Gear & Hardware Store Tenant)           |
+| • Backend Database     : MariaDB 10.11 StatefulSet on Kubernetes PVC                             |
+| • Media & Assets       : PersistentVolumeClaim (/var/www/html/wp-content) with Studio Photos     |
+| • Test Payment Gateway : Pre-configured Cash on Delivery (COD) for zero-credential orders        |
++--------------------------------------------------------------------------------------------------+
+
+================================================================================
+                    DETAILED BREAKDOWN BY ARCHITECTURAL TIER
+================================================================================
+
+1. INGRESS & ROUTING TIER:
+   - Zero-Friction DNS: Uses public wildcard DNS (*.127.0.0.1.nip.io) resolving to 127.0.0.1.
+     Eliminates any manual modification of /etc/hosts or Windows system files.
+   - NGINX Ingress Controller: Exposes port 80 and terminates HTTP traffic, routing by Host header.
+
+2. UNIFIED GATEWAY TIER (Control Plane):
+   - Single Endpoint: Aggregates dozens of fragmented tools behind http://dashboard.127.0.0.1.nip.io/mcp.
+   - Collision-Proof Namespacing: Automatically prefixes tools with upstream slugs (woo__, tasks__, utilities__).
+   - Fine-Grained RBAC: Mutating actions (create_product, create_task) require the "admin" role.
+     Members (like Alice) receive HTTP 403 Forbidden on write attempts while retaining read access.
+   - Fault Tolerance: Individual upstreams can be disabled or crash without affecting other servers.
+   - Immutable Audit Trail: Every invocation, whether allowed or blocked, is logged with caller identity,
+     latency (ms), upstream server, and full JSON payload.
+
+3. UPSTREAM MICROSERVICES TIER:
+   - Independent Pods: Upstreams run as isolated containers inside Kubernetes.
+   - Protocol: Standardized on Streamable HTTP MCP (2024-11-05 spec).
+   - Zero Coupling: Upstreams never communicate directly with each other; all coordination flows through Gateway.
+
+4. STOREFRONT & PERSISTENCE TIER:
+   - High Availability: MariaDB runs as a Kubernetes StatefulSet with dedicated PVC storage.
+   - Real Commercial Catalog: Pre-seeded with 8 active products featuring studio photography and responsive srcsets.
+   - Multi-Tenant Support: Dynamically provisions secondary stores (store2) with isolated namespaces.
+
+

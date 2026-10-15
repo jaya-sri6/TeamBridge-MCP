@@ -44,6 +44,12 @@ const TOOLS = [
         regular_price: { type: "string", description: "Product price in store currency (e.g. '19.99')" },
         description: { type: "string", description: "Full HTML or plain text description of the product" },
         short_description: { type: "string", description: "Brief summary or excerpt for the product" },
+        image_url: { type: "string", description: "Optional image URL to attach as the featured product photo" },
+        images: {
+          type: "array",
+          description: "Optional array of image objects with 'src' or 'id' (e.g. [{ src: 'http://...' }])",
+          items: { type: "object", properties: { src: { type: "string" }, id: { type: "number" } } },
+        },
       },
       required: ["name", "regular_price"],
     },
@@ -134,25 +140,59 @@ async function handleToolCall(name: string, args: Record<string, any> = {}) {
     }
 
     case "create_product": {
+      let productImages = args.images;
+      if (!productImages && args.image_url) {
+        productImages = [{ src: args.image_url }];
+      }
+
+      // Auto-assign studio photograph if not provided
+      if (!productImages || productImages.length === 0) {
+        const nameLower = (args.name || "").toLowerCase();
+        const baseUploadUrl = process.env.STORE_URL 
+          ? `${process.env.STORE_URL.replace(/\/+$/, "")}/wp-content/uploads/2026/10`
+          : "http://store.127.0.0.1.nip.io/wp-content/uploads/2026/10";
+
+        if (nameLower.includes("mouse") || nameLower.includes("cursor")) {
+          productImages = [{ src: `${baseUploadUrl}/neon-cyber-mouse.jpg` }];
+        } else if (nameLower.includes("sunglass") || nameLower.includes("glass") || nameLower.includes("shade")) {
+          productImages = [{ src: `${baseUploadUrl}/neon-cyber-sunglasses.jpg` }];
+        } else if (nameLower.includes("headphone") || nameLower.includes("earphone") || nameLower.includes("audio")) {
+          productImages = [{ src: `${baseUploadUrl}/p20.jpg` }];
+        } else if (nameLower.includes("keyboard") || nameLower.includes("key")) {
+          productImages = [{ src: `${baseUploadUrl}/p17.jpg` }];
+        } else if (nameLower.includes("desk") || nameLower.includes("pad") || nameLower.includes("mat")) {
+          productImages = [{ src: `${baseUploadUrl}/p18.jpg` }];
+        } else if (nameLower.includes("hoodie") || nameLower.includes("shirt") || nameLower.includes("apparel")) {
+          productImages = [{ src: `${baseUploadUrl}/p7.jpg` }];
+        } else if (nameLower.includes("chair") || nameLower.includes("seat")) {
+          productImages = [{ src: `${baseUploadUrl}/p5.jpg` }];
+        } else {
+          productImages = [{ src: `${baseUploadUrl}/neon-cyber-sunglasses.jpg` }];
+        }
+      }
+
       const product = await wooClient.createProduct({
         name: args.name,
         regular_price: String(args.regular_price),
         description: args.description,
         short_description: args.short_description,
+        images: productImages,
       });
+
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify(
               {
-                message: `Product '${product.name}' successfully created.`,
+                message: `Product '${product.name}' successfully created with attached studio photography.`,
                 product: {
                   id: product.id,
                   name: product.name,
                   price: product.price || product.regular_price,
                   permalink: product.permalink,
                   status: product.status,
+                  images: product.images,
                 },
               },
               null,

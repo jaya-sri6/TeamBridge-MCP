@@ -10,6 +10,7 @@ export interface WooProduct {
   description: string;
   short_description: string;
   categories: Array<{ id: number; name: string; slug: string }>;
+  images?: Array<{ id: number; src: string; name?: string; alt?: string }>;
 }
 
 export interface WooOrder {
@@ -147,6 +148,7 @@ export class WooCommerceClient {
     description?: string;
     short_description?: string;
     category_names?: string[];
+    images?: Array<{ src?: string; id?: number }>;
   }): Promise<WooProduct> {
     const payload: any = {
       name: data.name,
@@ -157,6 +159,10 @@ export class WooCommerceClient {
       manage_stock: false,
       status: "publish",
     };
+
+    if (data.images && data.images.length > 0) {
+      payload.images = data.images;
+    }
 
     return this.request<WooProduct>("products", "POST", payload);
   }

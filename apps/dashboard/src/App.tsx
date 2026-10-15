@@ -61,6 +61,37 @@ interface ChatMessage {
   }>;
 }
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  // 1. Try modern clipboard API if supported and in secure context
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to fallback
+    }
+  }
+
+  // 2. Bulletproof fallback for HTTP / *.nip.io / insecure contexts
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "-9999px";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.warn("Clipboard copy failed:", err);
+    return false;
+  }
+}
+
 export function App() {
   const [activeTab, setActiveTab] = useState<"servers" | "chat" | "team" | "audit" | "stores" | "metrics" | "rbac">("servers");
   const [users, setUsers] = useState<User[]>([]);
@@ -409,10 +440,12 @@ export function App() {
                   <code className="hero-endpoint-code">http://dashboard.127.0.0.1.nip.io/mcp</code>
                   <button
                     className="copy-pill-btn"
-                    onClick={() => {
-                      navigator.clipboard.writeText("http://dashboard.127.0.0.1.nip.io/mcp");
-                      setCopiedEndpoint(true);
-                      setTimeout(() => setCopiedEndpoint(false), 2000);
+                    onClick={async () => {
+                      const success = await copyToClipboard("http://dashboard.127.0.0.1.nip.io/mcp");
+                      if (success) {
+                        setCopiedEndpoint(true);
+                        setTimeout(() => setCopiedEndpoint(false), 2000);
+                      }
                     }}
                   >
                     {copiedEndpoint ? "✓ Copied" : "Copy"}
@@ -1140,8 +1173,10 @@ export function App() {
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
                     className="btn btn-primary"
-                    onClick={() => {
-                      navigator.clipboard.writeText(newKeyPlaintext);
+                    onClick={async () => {
+                      if (newKeyPlaintext) {
+                        await copyToClipboard(newKeyPlaintext);
+                      }
                       setNewKeyPlaintext(null);
                       setShowAddKeyModal(false);
                     }}
