@@ -28,8 +28,8 @@ TeamBridge implements a four-tier architecture running entirely within Kubernete
 | • Unified MCP Endpoint : http://dashboard.127.0.0.1.nip.io/mcp                                   |
 | • Transport Protocol   : Streamable HTTP (JSON-RPC 2.0)                                          |
 | • Runtime Core         : Fastify on Node.js 22                                                   |
-| • Identity & RBAC      : Role-Based Tool Enforcement (Admin: Read/Write, Member: Read-Only)     |
-| • Key Security         : HMAC SHA-256 Hashed API Keys with Salt & Instant Revocation             |
+| • Identity & RBAC      : Role-Based Tool Enforcement (Admin: Read/Write, Member: Read-Only)      |
+| • Key & OAuth Security : HMAC SHA-256 Hashed API Keys + RFC 6749/8414 OAuth 2.0 Server            |
 | • Defenses             : Active SSRF Blocking (169.254.169.254) + Token-Bucket Rate Limiter      |
 | • Local Database       : SQLite WAL on PersistentVolumeClaim (/app/data/teambridge.db)           |
 +------------------------------------------------+-------------------------------------------------+
@@ -93,13 +93,9 @@ Three isolated upstream servers run as independent Kubernetes pods:
 
 ---
 
-### 🎙️ 15-Second Architecture Speaking Script (For Demo Video)
+### 🎙️ 10-Second Architecture Opening Script (For Demo Video)
 
-> *"TeamBridge runs entirely on Kubernetes across four synchronized tiers:
-> First, our **Ingress and Client Tier** routes traffic from web browsers and external AI clients like Cursor using zero-friction `nip.io` domains.
-> Second, our **Unified Gateway Tier** serves as the single Streamable HTTP endpoint at `/mcp`, enforcing RBAC permissions, key authentication, and audit logging.
-> Third, our **Microservices Tier** consists of isolated upstream MCP pods for WooCommerce, Tasks, and Utilities, aggregating their tools with collision-proof namespacing.
-> And fourth, our **Storefront Tier** provides a live WordPress 6.7 and WooCommerce store backed by a MariaDB StatefulSet on persistent storage."*
+> **"TeamBridge is a 4-tier Kubernetes architecture: Ingress routes external clients to our Gateway, which enforces RBAC and aggregates WooCommerce, Tasks, and Utilities microservices over MariaDB."**
 
 ---
 

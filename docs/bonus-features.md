@@ -108,3 +108,24 @@ Instead of default WooCommerce grey placeholder icons, the store features studio
 - **Automated Responsive Thumbnails**:
   - All images are imported directly into the WordPress media library via WP-CLI (`wp media import --post_id=<id> --featured_image`).
   - WooCommerce automatically generates responsive thumbnail srcsets (`150x150`, `300x300`, `600x600`, `768x768`, `1024w`) for fast, responsive rendering on all devices.
+
+---
+
+## 7. Native OAuth 2.0 Authorization Server on Gateway
+
+### Standards Compliance & Architecture
+To support modern external AI clients and enterprise single-sign-on integrations, the Gateway implements native **RFC 6749 and RFC 8414 compliant OAuth 2.0 authorization server endpoints**:
+
+- **Metadata Discovery (RFC 8414 / OIDC)**:
+  - `GET /.well-known/oauth-authorization-server`
+  - `GET /.well-known/openid-configuration`
+  - Publishes supported response types (`code`, `token`), grant types (`authorization_code`, `client_credentials`), and scopes (`mcp:tools`, `openid`, `profile`).
+- **Authorization Code Grant (`/oauth/authorize`)**:
+  - Handles client authorization requests with `client_id`, `redirect_uri`, `state`, and `user_id`.
+  - Generates secure time-limited authorization codes (`tb_code_...`) and redirects or displays an interactive consent card in the dashboard theme.
+- **Token Exchange (`/oauth/token`)**:
+  - Validates authorization codes or client credentials and issues RFC 6750 standard Bearer access tokens with role metadata.
+- **Userinfo Endpoint (`/oauth/userinfo`)**:
+  - Provides authenticated caller profile introspection (`sub`, `name`, `email`, `role`).
+- **Cryptographic Token Verification**:
+  - Access tokens presented to `/mcp` are cryptographically verified against SQLite using salted HMAC SHA-256 hashes with sub-millisecond lookups and instant revocation checks.

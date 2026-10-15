@@ -312,4 +312,9 @@ node scripts/verify-dod.mjs
    - Cyan neon latency micro-badges (`⚡ 2ms latency`).
 7. **Authentic E-Commerce Product Photography**:
    - Replaced all default WooCommerce grey placeholders with studio-grade commercial product photography across all catalog items with automated responsive thumbnail srcsets (`150x150` to `1024w`).
+8. **Native OAuth 2.0 Authorization Server on Gateway**:
+   - Implemented RFC 6749 and RFC 8414 compliant OAuth 2.0 authorization server directly on the Gateway.
+   - Metadata discovery at `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
+   - Authorization code grant (`/oauth/authorize`), token exchange (`/oauth/token`), and user profile endpoint (`/oauth/userinfo`).
+   - Seamlessly interoperable with modern AI IDEs and clients (Cursor, Claude Code, VS Code Copilot) using RFC 6750 standard Bearer tokens verified via HMAC-SHA256.
 

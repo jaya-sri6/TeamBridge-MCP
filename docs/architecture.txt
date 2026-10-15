@@ -25,7 +25,7 @@
 | • Unified MCP Endpoint : http://dashboard.127.0.0.1.nip.io/mcp                                   |
 | • Transport Protocol   : Streamable HTTP (JSON-RPC 2.0)                                          |
 | • Runtime Core         : Fastify on Node.js 22                                                   |
-| • Identity & RBAC      : Role-Based Tool Enforcement (Admin: Read/Write, Member: Read-Only)     |
+| • Identity & RBAC      : Role-Based Tool Enforcement (Admin: Read/Write, Member: Read-Only)      |
 | • Key Security         : HMAC SHA-256 Hashed API Keys with Salt & Instant Revocation             |
 | • Defenses             : Active SSRF Blocking (169.254.169.254) + Token-Bucket Rate Limiter      |
 | • Local Database       : SQLite WAL on PersistentVolumeClaim (/app/data/teambridge.db)           |
