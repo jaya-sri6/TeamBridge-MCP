@@ -324,6 +324,12 @@ export function App() {
     }
   };
 
+  const isCloudflare = typeof window !== "undefined" && window.location.hostname.includes("trycloudflare.com");
+  const storefrontUrl = isCloudflare
+    ? "https://operational-springer-kodak-research.trycloudflare.com"
+    : "http://store.127.0.0.1.nip.io";
+  const unifiedMcpUrl = typeof window !== "undefined" ? `${window.location.origin}/mcp` : "http://dashboard.127.0.0.1.nip.io/mcp";
+
   return (
     <div className="app-container">
       {/* Top Navbar */}
@@ -347,7 +353,7 @@ export function App() {
           {/* User Identity Switcher */}
           <div className="user-switcher">
             <a
-              href="http://store.127.0.0.1.nip.io"
+              href={storefrontUrl}
               target="_blank"
               rel="noreferrer"
               className="storefront-link-btn"
@@ -437,11 +443,11 @@ export function App() {
                 </p>
                 <div className="hero-endpoint-box">
                   <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>Unified Endpoint:</span>
-                  <code className="hero-endpoint-code">http://dashboard.127.0.0.1.nip.io/mcp</code>
+                  <code className="hero-endpoint-code">{unifiedMcpUrl}</code>
                   <button
                     className="copy-pill-btn"
                     onClick={async () => {
-                      const success = await copyToClipboard("http://dashboard.127.0.0.1.nip.io/mcp");
+                      const success = await copyToClipboard(unifiedMcpUrl);
                       if (success) {
                         setCopiedEndpoint(true);
                         setTimeout(() => setCopiedEndpoint(false), 2000);
